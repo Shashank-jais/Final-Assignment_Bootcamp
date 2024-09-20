@@ -12,7 +12,7 @@ env:
   PRIVATE_KEY_PATH: .private_key.pem
   
   TARGET_DIR: ~/app
-  AWS_ECR_REPOSITORY_NAMESPACE: "ai-tsadok"
+  AWS_ECR_REPOSITORY_NAMESPACE: "ai-shashank"
 
 jobs:
   
@@ -71,13 +71,13 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} <<'EOF'
             AWS_ECR_REGISTRY="700935310038.dkr.ecr.us-east-1.amazonaws.com"
 
-            AWS_ECR_REPOSITORY=ai-tsadok/netflix-catalog
+            AWS_ECR_REPOSITORY=ai-shashank/netflix-catalog
             IMAGE_NAME="${AWS_ECR_REGISTRY}/${AWS_ECR_REPOSITORY}:latest"
             
             echo "Pulling ${IMAGE_NAME} ..."
             docker pull "${IMAGE_NAME}"
 
-            AWS_ECR_REPOSITORY="ai-tsadok/netflix-frontend"
+            AWS_ECR_REPOSITORY="ai-shashank/netflix-frontend"
             IMAGE_NAME="${AWS_ECR_REGISTRY}/${AWS_ECR_REPOSITORY}:latest"
             
             echo "Pulling ${IMAGE_NAME} ..."
