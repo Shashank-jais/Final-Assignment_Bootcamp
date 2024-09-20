@@ -53,25 +53,7 @@ jobs:
             df -h
           EOF
 
-      - name: Install Docker on the EC2
-        run: |
-
-          ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} <<'EOF'
-
-            echo ""
-            echo "Change directory to the app directory"
-            cd ${{ env.TARGET_DIR }}
-
-            echo ""
-            echo "Changing permissions ..."
-            sudo chmod +x install.sh
-
-            echo ""
-            echo "Executing the installation script ..."
-            ./install.sh
-          EOF
-
-
+      
       - name: Login to ECR (on the EC2 Instance)
         env: 
           AWS_REGION: us-east-1
