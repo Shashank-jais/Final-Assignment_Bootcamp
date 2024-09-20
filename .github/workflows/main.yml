@@ -80,6 +80,7 @@ jobs:
             done
           EOF
 
+
       - name: Execute deployment script
         run: |
           ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} <<'EOF'
