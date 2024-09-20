@@ -1,48 +1,97 @@
-name: CI/CD Pipeline
+name: Netflix Application Deployment
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+
+env:
+  EC2_PUBLIC_ADDRESS: shashank.devops-days-upes.com
+  EC2_USER_NAME: ubuntu
+  SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }} 
+  PRIVATE_KEY_PATH: .private_key.pem
+  
+  TARGET_DIR: ~/app
 
 jobs:
-  build:
+  
+  Deploy:
+
+    name: Deploy in AWS EC2
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout the app code
+        uses: actions/checkout@v2
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v1
+      - name: Setup SSH Key
+        run: |
+          rm -f ${{ env.PRIVATE_KEY_PATH }}
 
-    - name: Login to ECR
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: us-east-1 # change if necessary
-      run: |
-        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin 700935310038.dkr.ecr.us-east-1.amazonaws.com
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ${{ env.PRIVATE_KEY_PATH }}
+          chmod 600 ${{ env.PRIVATE_KEY_PATH }}
 
-    - name: Pull Docker images
-      run: |
-        docker pull 700935310038.dkr.ecr.us-east-1.amazonaws.com/ai-shashank/netflix-catalog:latest
-        docker pull 700935310038.dkr.ecr.us-east-1.amazonaws.com/ai-shashank/netflix-frontend:latest
+      - name: List files in EC2 instance
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} "ls -la ~/"
 
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
+      - name: Copy files to EC2 instance
+        run: |
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+          ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} "mkdir -p ${{ env.TARGET_DIR }}"
 
-    - name: Deploy to server
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      run: |
-        ssh user@18.212.194.28 "cd ~/PycharmProjects/Final-Assignment_Bootcamp && docker-compose down && docker-compose up -d"
+          scp -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} -r * ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }}:${{ env.TARGET_DIR }}
+
+          ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} <<'EOF'
+            echo ""
+            echo "Listing files in the home directory"
+            ls -la ${{ env.TARGET_DIR }}
+
+            echo ""
+            echo "Checking disk usage"
+            df -h
+          EOF
+
+      - name: Login to ECR (on the EC2 Instance)
+        env: 
+          AWS_REGION: us-east-1
+          AWS_ECR_REGISTRY: 700935310038.dkr.ecr.us-east-1.amazonaws.com
+          AWS_ECR_USERNAME: AWS
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} <<'EOF'
+            echo ""
+            echo "Docker login"
+            echo ${{ secrets.AWS_ECR_PASSWORD }} | docker login --username ${{ env.AWS_ECR_USERNAME }}  --password-stdin ${{ env.AWS_ECR_REGISTRY }}
+          EOF
+
+      - name: Pulling Docker Images
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} <<'EOF'
+            AWS_ECR_REGISTRY="700935310038.dkr.ecr.us-east-1.amazonaws.com"
+
+            AWS_ECR_REPOSITORY=ai-shashank/netflix-catalog
+            IMAGE_NAME="${AWS_ECR_REGISTRY}/${AWS_ECR_REPOSITORY}:latest"
+            
+            echo "Pulling ${IMAGE_NAME} ..."
+            docker pull "${IMAGE_NAME}"
+
+            AWS_ECR_REPOSITORY="ai-shashank/netflix-frontend"
+            IMAGE_NAME="${AWS_ECR_REGISTRY}/${AWS_ECR_REPOSITORY}:latest"
+            
+            echo "Pulling ${IMAGE_NAME} ..."
+            docker pull "${IMAGE_NAME}"
+          EOF
+
+
+      - name: Execute deployment script
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} <<'EOF'
+            echo ""
+            echo "Change directory to the app directory"
+            cd ${{ env.TARGET_DIR }}
+
+            echo ""
+            echo "Execute docker-compose up to deploy the application"  
+            sudo docker-compose -f docker-compose.yaml up -d > /dev/null 2>&1 &
+          EOF
+
