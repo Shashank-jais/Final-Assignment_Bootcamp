@@ -58,11 +58,12 @@ jobs:
           AWS_ECR_REGISTRY: 700935310038.dkr.ecr.us-east-1.amazonaws.com
           AWS_ECR_USERNAME: AWS
         run: |
-          ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} <<'EOF'
+          ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} <<EOF
             echo ""
             echo "Docker login"
-            echo ${{ secrets.AWS_ECR_PASSWORD }} | docker login --username ${{ env.AWS_ECR_USERNAME }}  --password-stdin ${{ env.AWS_ECR_REGISTRY }}
+            echo "${{ secrets.AWS_ECR_PASSWORD }}" | docker login --username "${{ env.AWS_ECR_USERNAME }}" --password-stdin "${{ env.AWS_ECR_REGISTRY }}"
           EOF
+
 
       - name: Pulling Docker Images
         run: |
