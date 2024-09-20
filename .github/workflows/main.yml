@@ -89,9 +89,14 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} <<'EOF'
             echo ""
+            echo "Stopping existing services"
+            sudo docker-compose -f ${{ env.TARGET_DIR }}/docker-compose.yaml down || true
+            
+            echo ""
             echo "Change directory to the app directory"
             cd ${{ env.TARGET_DIR }}
+            
             echo ""
-            echo "Execute docker-compose up to deploy the application"  
+            echo "Starting the application"  
             sudo docker-compose -f docker-compose.yaml up -d
           EOF
