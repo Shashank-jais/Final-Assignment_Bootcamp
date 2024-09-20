@@ -10,6 +10,7 @@ env:
   EC2_USER_NAME: ubuntu
   SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }} 
   PRIVATE_KEY_PATH: .private_key.pem
+  
   TARGET_DIR: ~/app
   AWS_ECR_REPOSITORY_NAMESPACE: "ai-shashank"
 
@@ -27,6 +28,7 @@ jobs:
       - name: Setup SSH Key
         run: |
           rm -f ${{ env.PRIVATE_KEY_PATH }}
+
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ${{ env.PRIVATE_KEY_PATH }}
           chmod 600 ${{ env.PRIVATE_KEY_PATH }}
 
@@ -36,12 +38,16 @@ jobs:
 
       - name: Copy files to EC2 instance
         run: |
+
           ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} "mkdir -p ${{ env.TARGET_DIR }}"
+
           scp -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} -r * ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }}:${{ env.TARGET_DIR }}
+
           ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} <<'EOF'
             echo ""
             echo "Listing files in the home directory"
             ls -la ${{ env.TARGET_DIR }}
+
             echo ""
             echo "Checking disk usage"
             df -h
@@ -49,12 +55,22 @@ jobs:
 
       - name: Install Docker on the EC2
         run: |
+
           ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} <<'EOF'
-            sudo apt-get update
-            sudo apt-get install -y docker.io docker-compose
-            sudo systemctl start docker
-            sudo systemctl enable docker
+
+            echo ""
+            echo "Change directory to the app directory"
+            cd ${{ env.TARGET_DIR }}
+
+            echo ""
+            echo "Changing permissions ..."
+            sudo chmod +x install.sh
+
+            echo ""
+            echo "Executing the installation script ..."
+            ./install.sh
           EOF
+
 
       - name: Login to ECR (on the EC2 Instance)
         env: 
@@ -65,18 +81,20 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} <<'EOF'
             echo ""
             echo "Docker login"
-            echo ${{ secrets.AWS_ECR_PASSWORD }} | docker login --username ${{ env.AWS_ECR_USERNAME }} --password-stdin ${{ env.AWS_ECR_REGISTRY }}
+            echo ${{ secrets.AWS_ECR_PASSWORD }} | docker login --username ${{ env.AWS_ECR_USERNAME }}  --password-stdin ${{ env.AWS_ECR_REGISTRY }}
           EOF
 
       - name: Pulling Docker Images
         run: |
           ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} <<'EOF'
             AWS_ECR_REGISTRY="700935310038.dkr.ecr.us-east-1.amazonaws.com"
+
             AWS_ECR_REPOSITORY=ai-shashank/netflix-catalog
             IMAGE_NAME="${AWS_ECR_REGISTRY}/${AWS_ECR_REPOSITORY}:latest"
             
             echo "Pulling ${IMAGE_NAME} ..."
             docker pull "${IMAGE_NAME}"
+
             AWS_ECR_REPOSITORY="ai-shashank/netflix-frontend"
             IMAGE_NAME="${AWS_ECR_REGISTRY}/${AWS_ECR_REPOSITORY}:latest"
             
@@ -89,14 +107,10 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} <<'EOF'
             echo ""
-            echo "Stopping existing services"
-            sudo docker-compose -f ${{ env.TARGET_DIR }}/docker-compose.yaml down || true
-            
-            echo ""
             echo "Change directory to the app directory"
             cd ${{ env.TARGET_DIR }}
-            
+
             echo ""
-            echo "Starting the application"  
-            sudo docker-compose -f docker-compose.yaml up -d
+            echo "Execute docker-compose up to deploy the application"  
+            sudo docker-compose -f docker-compose.yaml up -d > /dev/null 2>&1 &
           EOF
