@@ -72,12 +72,16 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -i ${{ env.PRIVATE_KEY_PATH }} ${{ env.EC2_USER_NAME }}@${{ env.EC2_PUBLIC_ADDRESS }} <<'EOF'
             AWS_ECR_REGISTRY="700935310038.dkr.ecr.us-east-1.amazonaws.com"
-
-            for REPO in "ai-shashank/netflix-catalog" "ai-shashank/netflix-frontend"; do
-              IMAGE_NAME="\${AWS_ECR_REGISTRY}/\${REPO}:latest"
-              echo "Pulling \${IMAGE_NAME} ..."
-              docker pull "\${IMAGE_NAME}"
-            done
+            AWS_ECR_REPOSITORY=ai-shashank/netflix-catalog
+            IMAGE_NAME="${AWS_ECR_REGISTRY}/${AWS_ECR_REPOSITORY}:latest"
+            
+            echo "Pulling ${IMAGE_NAME} ..."
+            docker pull "${IMAGE_NAME}"
+            AWS_ECR_REPOSITORY="ai-shashank/netflix-frontend"
+            IMAGE_NAME="${AWS_ECR_REGISTRY}/${AWS_ECR_REPOSITORY}:latest"
+            
+            echo "Pulling ${IMAGE_NAME} ..."
+            docker pull "${IMAGE_NAME}"
           EOF
 
 
